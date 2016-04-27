@@ -138,14 +138,14 @@ object Elastic {
   )(jsonStream: ElasticCfg => Process[Task, Json]): ES[Unit] = {
     def doPublish(de: Process[Task, Seq[Json]], cfg: ElasticCfg): Process[Task, Unit] =
       de to constant(
-        (jsons: Seq[Json]) => retry(iselfie.HttpResponse2xx.timeTask(
+        (jsons: Seq[Json]) => retry(/* [Stop the Bleeding] iselfie.HttpResponse2xx.timeTask(*/
           for {
             //delaying task is important here. Otherwise we will not really retry to send http request
             u <- Task.delay(esBulkURL)
             _ = log.debug(s"Posting ${jsons.size} docs.")
             _ <- H.http(POST(u, Reader((cfg: ElasticCfg) => toBulkPayload(jsons))))(cfg)
           } yield ()
-        ))(iselfie).attempt.map {
+        /* [Stop the Bleeding] )*/)(iselfie).attempt.map {
           case \/-(v) => ()
           case -\/(t) =>
             //if we fail to publish metric, proceed to the next one
