@@ -206,14 +206,12 @@ trait Monitoring {
 
           def attemptedTask:Unit =
             Task.fork(receivedIdempotent.run)(defaultPool)
-              .attempt
-              .flatMap(
+              .runAsync(
                 _.fold(
                   e => Task.delay(log.error(s"source=$source\tcluster=$cluster\t${e.getMessage}")),
                   Task.now
                 )
               )
-              .runAsync(_ => ())
 
           Task.delay(attemptedTask)
         }
