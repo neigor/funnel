@@ -127,10 +127,6 @@ trait Monitoring {
     }
   }
 
-  /** Terminate `p` when the given `Signal` terminates. */
-  def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
-    alive.continuous.zip(p).map(_._2)
-
   def processMirroringEvents(
     parse: DatapointParser,
     myName: String = "Funnel Mirror",
@@ -138,7 +134,6 @@ trait Monitoring {
   ): Task[Unit] = {
     val S = Strategy.Executor(Monitoring.defaultPool)
     val active    = signalOf[Set[URI]](Set.empty)(S)
-
 
     /*
      We are given a URI to close via the Discard message.
@@ -217,7 +212,15 @@ trait Monitoring {
   }
 
   def logErrors[A](t: Task[A]) =
-    t.attempt.flatMap(_.fold(e => Task.delay(log.error(e.getMessage)), Task.now))
+    t.attempt.flatMap(
+      _.fold(
+        e => {
+          val message = (e.getMessage ::  e.getStackTrace.toList).mkString("\n","\t\n","")
+          Task.delay(log.error(message))
+        }, 
+        Task.now
+      )
+    )
 
   /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
@@ -644,6 +647,10 @@ object Monitoring {
     val retries = schedule.zip(step.repeat).map(_._2)
     (step ++ retries).last.flatMap(_.fold(Process.fail, Process.emit))
   }
+
+  /** Terminate `p` when the given `Signal` terminates. */
+  def link[A](alive: Signal[Unit])(p: Process[Task,A]): Process[Task,A] =
+    alive.continuous.zip(p).map(_._2)
 
   private[funnel] def formatURI(uri: URI): String = {
     val host = uri.getHost

@@ -64,11 +64,16 @@ class Flask(options: Options, val I: Instruments) {
     signal.set(false).flatMap(_ => signal.close).run
   }
 
-  private def runAsync(p: Task[Unit]): Unit = p.runAsync(_.fold(e => {
-    e.printStackTrace()
-    log.error(s"[FATAL]: error in runAsync(): error=$e msg=${e.getMessage}")
-    log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
-  }, identity _))
+  private def runAsync(p: Task[Unit], onCompleteLogMessage: Option[String] = None): Unit =
+    p.runAsync(
+      _.fold(e => {
+          e.printStackTrace()
+          log.error(s"[FATAL]: error in runAsync(): error=$e msg=${e.getMessage}")
+          log.error(e.getStackTrace.toList.mkString("\n","\t\n",""))
+        },
+          _ => onCompleteLogMessage foreach(log.info(_))
+      )
+    )
 
   private def httpOrZmtp(alive: Signal[Boolean])(uri: URI): Process[Task,Datapoint[Any]] =
     Option(uri.getScheme).map(_.toLowerCase) match {
@@ -116,7 +121,10 @@ class Flask(options: Options, val I: Instruments) {
     }
 
     log.info("Booting the mirroring process...")
-    runAsync(I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries))
+    runAsync(
+      I.monitoring.processMirroringEvents(processDatapoints(signal), flaskName, retries),
+      Some("mirroring process finished")
+    )
 
     log.info("Mirroring my own monitoring server instance...")
     List(s"http://$flaskHost:${options.selfiePort}/stream/previous",
@@ -126,12 +134,18 @@ class Flask(options: Options, val I: Instruments) {
 
     options.elasticExploded.foreach { elastic =>
       log.info("Booting the elastic-exploded search sink...")
-      runAsync(ElasticExploded(I.monitoring, ISelfie).publish(flaskName, flaskCluster)(elastic))
+      runAsync(
+        ElasticExploded(I.monitoring, ISelfie).publish(flaskName, flaskCluster)(elastic),
+        Some("elastic exploded search sink finished")
+      )
     }
 
     options.elasticFlattened.foreach { elastic =>
       log.info("Booting the elastic-flattened search sink...")
-      runAsync(ElasticFlattened(I.monitoring, ISelfie).publish(options.environment, flaskName, flaskCluster)(elastic))
+      runAsync(
+        ElasticFlattened(I.monitoring, ISelfie).publish(options.environment, flaskName, flaskCluster)(elastic),
+        Some("elastic flattened search sink finished")
+      )
     }
   }
 }
