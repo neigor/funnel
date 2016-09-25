@@ -74,7 +74,7 @@ trait DispatchHttpLayer extends HttpLayer {
     val status = resp.getStatusCode
     if((status / 100) == 2) resp.getResponseBody
     else {
-      log.error(s"Backend returned a code ${resp.getStatusCode} failure. Body response was: ${resp.getResponseBody}")
+      log.error(s"Backend returned a code ${resp.getStatusCode} failure for url ${resp.getUri}. Body response was: ${resp.getResponseBody}")
       throw StatusCode(status)
     }
   })

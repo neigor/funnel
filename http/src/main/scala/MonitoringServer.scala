@@ -236,9 +236,15 @@ class MonitoringServer(M: Monitoring, port: Int, keyTTL: Duration = 36.hours) {
     }
   }
 
+  protected def logRequest(req: HttpExchange): Unit = {
+      val requestPath =  req.getRequestURI.getPath
+      val remoteHost =  req.getRemoteAddress.getHostName
+      M.log.info(s"request: $requestPath from $remoteHost")
+  }
+
   protected def handleMetrics(M: Monitoring) = new HttpHandler {
     def handle(req: HttpExchange): Unit = try {
-      M.log.info("requested path: " + req.getRequestURI.getPath)
+      logRequest(req)
       val path = req.getRequestURI.getPath match {
         case "/" => Nil
         case p   => p.split("/").toList.tail
