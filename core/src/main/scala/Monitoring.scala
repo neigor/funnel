@@ -204,7 +204,16 @@ trait Monitoring {
             else Process.eval_(modifyActive(cluster, _ + source)) ++ received
           }
 
-          Task.delay(logErrors(Task.fork(receivedIdempotent.run)(defaultPool)).runAsync(_ => ()))
+          def attemptedTask:Unit =
+            Task.fork(receivedIdempotent.run)(defaultPool)
+              .runAsync(
+                _.fold(
+                  e => Task.delay(log.error(s"source=$source\tcluster=$cluster\t${e.getMessage}")),
+                  Task.now
+                )
+              )
+
+          Task.delay(attemptedTask)
         }
         case Discard(source) => for {
           _ <- Task.delay(log.info(s"Attempting to stop monitoring $source..."))
@@ -215,9 +224,6 @@ trait Monitoring {
       }.run
     } yield ()
   }
-
-  def logErrors[A](t: Task[A]) =
-    t.attempt.flatMap(_.fold(e => Task.delay(log.error(e.getMessage)), Task.now))
 
   /**
    * Mirror all metrics from the given URL, adding `localPrefix` onto the front of
