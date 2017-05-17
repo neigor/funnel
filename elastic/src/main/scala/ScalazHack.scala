@@ -21,7 +21,8 @@ object ScalazHack {
           droppedCounter.incrementBy(overflow)
           q.drop(overflow)
         } else {
-          currentSize.set(sz)
+          //BUG: Stop the bleeding
+          //currentSize.set(sz)
           q
         }
       }
